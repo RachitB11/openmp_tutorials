@@ -1,0 +1,40 @@
+Parallel computing allows us to go for the same throughput at a lower power.
+Power  = Capacitance)(Voltage)^2(Frequency)
+Concurrency: Multiple active agents are working at the same time.
+Parallelism: Multiple programs are being executed at the same time.
+
+
+OpenMP: API for writing multi-threaded applications
+- Most of the constructs in OpenMP are
+  #pragma omp construct[clause [clause]...]
+    Eg: #pragma omp parallel num_threads(4)
+- You need to #include<omp.h>
+- It operates on structured blocks i.e. only on blocks of code with entry and exit
+  you cannot jump in the middle.
+- To set default number of threads $export OMP_NUM_THREADS=4
+
+Shared memory computer:
+- A computer is composed of multiple processing units that share an address space.
+- There are 2 classes of this:
+  - SMP (Symmetric multiprocessor): Equal time access for each processor and OS
+    treats each processor equally.
+  - NUMA (Non uniform Address Space multiprocessor): Not all memory is equal.
+    Different regions have different access costs.
+- Nearly all computers are NUMA now.
+- Because of the cache architecture nowadays if the block of memory is close to the
+  processor then it has much faster access than if it was far away. So nothing is
+  truly SMP.
+- Remember there is no constraint on threads running in order or even getting
+  completed before another thread is begun executing. They interleave.
+- Each thread has its own copy of the variables in the stack but they share the
+  data, text and heap spaces in the computer.
+- Unintended sharing of data causes race conditions. (When multiple threads
+  simultaneously try to modify the shared memory)
+- These race conditions cause getting different answers every-time. To control
+  these use synchronization and protect data conflicts. Syncing is expensive,
+  so make sure you're doing it right.
+
+Fork join parallelism
+- The main thread (id 0) is running serially and then forks into numerous threads.
+- The master as well as the forked threads are called a team. These run parallely.
+- The only way to create parallel threads in openmp is using the construct parallel.
