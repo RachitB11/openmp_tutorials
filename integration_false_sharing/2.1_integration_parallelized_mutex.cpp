@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <omp.h>
 #include <mutex>
+#define NUM_THREADS 4
 
 std::mutex sum_mutex;
 
 // Intgrate 4/(1+x^2) from 0 to 1. Should give pi.
 int main()
 {
-  static long num_steps = 100000;
+  static long num_steps = 100000000;
   double step;
   double pi,sum=0.0;
 
@@ -17,10 +18,10 @@ int main()
   step = 1/(double) num_steps;
 
   // Requests some number of threads
-  omp_set_num_threads(num_threads);
+  omp_set_num_threads(NUM_THREADS);
 
-  // Set the partition size in each thread
-  static long partition_size = num_steps/num_threads;
+  // Variable to store the actual number of threads which may be lesser than the one requested
+  int num_threads_actual;
 
   // Init time
   double start_t = omp_get_wtime();
@@ -28,14 +29,18 @@ int main()
   #pragma omp parallel
   // The scope defines the structured block
   {
-    double x;
-
+    double x, partial_sum=0.0;
+    // Even though you request a number of threads you may not get all of them.
+    // So you need to check the number of threads before.
+    int nthrds = omp_get_num_threads();
     // This gives the identifier for the thread
     int ID=omp_get_thread_num();
-    long begin = ID*partition_size;
-    long end = ((ID+1)*partition_size);
-    double partial_sum=0.0;
-    for(int i=begin; i<end; i++)
+
+    // For the main thread with root ID set the shared variable using the local variable
+    if(ID==0) num_threads_actual = nthrds;
+
+    // This is called round robin cycling (ID 0: 0,4,8,.. ID 1: 1,5,9,...)
+    for(int i=ID; i<num_steps; i+=nthrds)
     {
       x = (i+0.5)*step;
       partial_sum+=4/(1.0+(x*x));

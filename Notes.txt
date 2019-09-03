@@ -12,6 +12,11 @@ OpenMP: API for writing multi-threaded applications
 - It operates on structured blocks i.e. only on blocks of code with entry and exit
   you cannot jump in the middle.
 - To set default number of threads $export OMP_NUM_THREADS=4
+- To boil it down remember 4 things:
+  - Its a multi threading shared address model
+  - Unintended sharing of data causes race conditions
+  - To control race conditions use synchronization to protect data conflicts
+  - Change how data is accessed to minimize the need for synchronization
 
 Shared memory computer:
 - A computer is composed of multiple processing units that share an address space.
