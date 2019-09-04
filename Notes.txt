@@ -43,3 +43,111 @@ Fork join parallelism
 - The main thread (id 0) is running serially and then forks into numerous threads.
 - The master as well as the forked threads are called a team. These run parallely.
 - The only way to create parallel threads in openmp is using the construct parallel.
+
+Synchronization
+- There are 2 main methods of synchronization in OpenMP:
+  - Barrier: Each thread waits at the barrier till all arrive
+  - Mutual Exclusion: A block of code can only be implemented by a single thread
+- High level syncs: Critical, Atomic, Barrier, Ordered
+- Low level syncs: Flush, Locks
+- Barrier:
+  #pragma omp parallel
+  {
+    int id = omp_get_thread_num();
+    A[id] = big_cal1(id);
+    // So here we are at a position where A needs to be used further. So a Barrier
+    // is constructed to make sure all the threads are done working with A before
+    // proceeding
+    #pragma omp barrier
+    {
+      B[id] = big_cal2(id,A);
+    }
+  }
+- Mutual Exclusion:
+  float res;
+  #pragma omp parallel
+  {
+    float B;
+    int i, id,nthrds;
+    id = omp_get_thread_num();
+    nthrds = omp_get_num_threads();
+    for(i=id;i<niters;i+=nthrds)
+    {
+      B=big_job(i);
+      // Here we have this shared variable res being used by the threads. But we
+      // don't want a race condition. So  to avoid this other threads are blocked
+      // while one executes the code after the critical. This is mutual exclusion.
+      #pragma omp critical
+      {
+        res+= consume(B);
+      }
+    }
+  }
+- Atomic: It is a hardware construct thats used only when it is available
+  #pragma omp parallel
+  {
+    double tmp,B;
+    B=DOIT();
+    tmp = big_ugly(B);
+    #pragma omp atomic
+    {
+      X+=tmp;
+    }
+  }
+
+Worksharing
+- Most of the stuff we have been doing is Single Program multiple data (SPMD)
+  where the data is being divided and running parallely the same code. It may
+  also be called SIMD (Single instruction multiple data)
+- Work sharing spreads the work withing the structured code between the team.
+- There's the loop construct, section/s construct, single construct etc.
+- for loop construct:
+  #pragma omp parallel
+  {
+    #pragma omp for
+    for(i=0;i<N;i++)
+    {
+        Neat_stuff(i);
+    }
+  }
+  When just a for loop is present in the structure then
+  #pragma omp parallel for
+  {
+    for(i=0;i<N;i++)
+    {
+        Neat_stuff(i);
+    }
+  }
+- As can be seen all of the complexities of SPMD code with having to deal with
+  ids and nthreads is abstracted away.
+- How do we deal out the chunks of data in the for loop needs to be defined and that
+  is done via schedules. You can use the schedule after the omp for
+  - schedule(static,[,chunk]) : Just deal out blocks of iterations of size "chunk"
+    to each thread. It deals out evenly sized blocks if chunk is not defined.
+  - schedule(dynamic,[,chunk]) : Maintain the blocks in a queue and grab "chunk" data
+    at runtime. This is unlike static where stuff was allocated at compile time. This
+    adjusts dynamically to how individual threads perform.
+  - schedule(guided,[,chunk]) : Large block size initially and then go down to
+    chunk size
+  - schedule(runtime): Schedule and chunk size taken at runtime from the OMP_SCHEDULE variable.
+  - schedule(auto): Schedule is left it upto runtime to choose.
+- Use static when you know that the work per iteration is almost the same and use
+  dynamic when the work per iteration is variable. It is a complex scheduler at runtime
+- Useful tools omp_set_schedule(), omp_get_schedule() etc. Play around with these
+  and figure out which one works best.
+- Find the compute intensive loops and make sure you can structure it to be able to use pragma omp for
+- Reduction clause:
+  - Used when the value depends on the previous n iterations (Eg computing the average or factorial)
+  - reduction(op:list)
+  - Create a local copy of the variable in the list depending on the "op" like
+    0 for addition and 1 for multiplication
+  - Example: Calculating the average
+  double ave=0.0, A[MAX]; int i;
+  #pragma omp parallel for reduciton(+:ave)
+  {
+    for(i=0;i<MAX;i++)
+    {
+      ave+=A[i];
+    }
+  }
+  ave/=MAX;

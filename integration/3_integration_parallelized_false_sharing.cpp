@@ -16,6 +16,7 @@ but the modifications cause switches in the cache lines and hence added compiler
 - A dirty work around is to allocate space so that the elements that will be accessed
 will not lie on the same cache line
 - So here we PAD it with 8 assuming a 64 byte cache line size
+- This sucks because I have to define a pad and also know information about the cache line
 */
 
 // Intgrate 4/(1+x^2) from 0 to 1. Should give pi.
