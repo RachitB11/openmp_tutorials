@@ -151,3 +151,235 @@ Worksharing
     }
   }
   ave/=MAX;
+
+Advanced
+- barriers and nowait:
+  // Define the shared and private variables
+  #pragma omp parallel shared(A,B,C) private(id)
+  {
+    id = omp_get_thread_num();
+    A[id] = big_calc(id);
+
+    // We want to use A further so need to setup a barrier
+    #pragma omp barrier
+
+    // C is going to be used further so we use the simple for. This for implicitly
+    // states that the for loop must complete in all threads before moving further.
+    #pragma omp for
+      for(i=0;i<N;i++){C[i] = big_cal2(i,A)}
+
+    // Here we explicitly add a no wait because B is not going to be used in the
+    // thread. So there is no point blocking a thread.
+    #pragma omp for nowait
+      for(i=0;i<N;i++){B[i] = big_cal3(i,C)}
+
+    A[id] = big_cal4(id);
+
+    // Implicit barrier here because all the threads need to complete and merge
+  }
+
+- master:
+  #pragma omp parallel
+  {
+    do_many_things();
+    // This just says that just the master will do the things in this code block
+    #pragma omp master
+    {
+      exchange_boundaries();
+    }
+    // Wait for the master to complete before moving on. So hence add the barrier
+    #pragma omp barrier
+
+    do_many_other_things();
+  }
+
+- single:
+  #pragma omp parallel
+  {
+    do_many_things();
+    // This just says that a single thread which is the first thread to access the
+    // block will do this and there is also an implicit call for the other threads
+    // to wait until this is executing. So no barrier was required here just like
+    // the for construct.
+    #pragma omp single
+    {
+      exchange_boundaries();
+    }
+    do_many_other_things();
+  }
+
+- section(s):
+  #pragma omp parallel
+  {
+    // Here we define the sections which just means that one thread does the x section,
+    // another the y section and so on
+    #pragma_omp_sections
+    {
+      #pragma omp section
+        x_calculation();
+      #pragma omp section
+        y_calculation();
+      #pragma omp section
+        z_calculation();
+    }
+  }
+
+- locks:
+  - The lowest form of achieving synchronization
+  - Methods:
+    - omp_init_lock()
+    - omp_set_lock()
+    - omp_unset_lock()
+    - omp_destroy_lock()
+    - omp_test_lock() (Checks if the lock is available)
+  - While critical blocks the entire critical block. This allows us to selectively
+    block and unblock
+  - Eg: Suppose you were adding values to a histogram with a large bin size. If you
+    used critical and blocked at every increment you would serialize the thing. Instead
+    maintain a lock for each bin because the chances of multiple threads accessing the
+    same bin is low (uncontended lock).
+      // Initialize all the locks
+      #pragma omp parallel for
+      for(i=0;i<NBUCKETS;i++)
+      {
+        omp_init_lock(&hist_locks[i]);
+        hist[i]=0;
+      }
+
+      // Use the vals to populate the histogram
+      #pragma omp parallel for
+      for(i=0;i<NVALS;i++)
+      {
+        ival = (int)sample(arr[i]);
+
+        // Block only the bin which is being
+        omp_set_lock(&hist_locks[ival])
+          hist[ival]++;
+        omp_unset_lock(&hist_locks[ival])
+      }
+
+      // Delete the locks
+      #pragma omp parallel for
+      for(i=0;i<NBUCKETS;i++)
+      {
+        omp_destory_lock(&hist_locks[i]);
+      }
+
+- Runtime library routines
+  - Some examples:
+    - omp_set_num_threads()
+    - omp_get_num_threads()
+    - omp_get_thread_num()
+    - omp_get_max_threads() : Says I wont give you more threads than this
+    - omp_in_parallel() : Calling in a parallel region or not?
+    - omp_set_dynamic() : Depending on the load different parallel regions may get different number of threads
+    - omp_get_dynamic() : Am I in dynamic mode or not?
+    - omp_num_procs() : How many actual processors are there?
+  - Example:
+    #include <omp.h>
+    void main()
+    {
+      int num_threads;
+
+      // I care about the number of threads being used and I don't want the system
+      // to dynamically keep on switching the number of threads on me. So I set
+      // dynamic as off
+      omp_set_dynamic(0);
+
+      // Request the number of threads equal to the number of processors
+      omp_set_num_threads(omp_num_procs());
+
+      #pragma omp parallel
+      {
+        // Get the thread id
+        int id = omp_get_thread_num();
+
+        // Just one of threads execute this block while others wait.
+        #pragma omp single
+        {
+          // Get the actual number of threads allocated
+          // Need to do this in the parallel region. Thats when the threads
+          // actually get allocated
+          num_threads = omp_get_num_threads();
+        }
+        do_lots_of_stuff_id(id);
+      }
+    }
+
+- Environment variables
+  - Some examples:
+    - OMP_NUM_THREADS : Number of threads being asked for
+    - OMP_STACKSIZE : For each thread some amount of stack is allocated. So if your
+      parallel constructs have beefy data structs then you wanna tell how much
+      of the stack size you want allocated.
+    - OMP_WAIT_POLICY : Suppose threads need to wait for a critical section to
+      complete. You can define the wait policy as ACTIVE and have the thread consuming
+      cpu cycles and constantly spinning till it gets the critical section or remain
+      passive so that the thread is put to sleep i.e. PASSIVE. Sleeping and making it
+      active is expensive. So if the threads are not anticipated to wait long then
+      use ACTIVE else use PASSIVE.
+    - OMP_PROC_BIND : So we have NUMA machines as discussed before. It is easier for
+      a core to access a certain piece of memory than the other. So if we've carefully
+      managed the cache we would want the threads being spawned to be binded to a core.
+      A tradeoff is that the capability of the CPU to move the thread to another core
+      if the current core is busy is restricted.
+
+Data Environment
+- OpenMP is a shared memory programming model. Most variables are shared by default.
+- Global variables are shared among threads (file scope and static. Note that static varibales
+  are defined in the code section)
+- Stack variables are not shared. Heap variables are shared.
+- NOTE: Do not take the stack heap terminology seriously stack variables defined outside
+  the parallel construct may not be on the heap but are shared variables in the thread.
+- You can change the storage attributes using these constructs:
+  - SHARED
+  - PRIVATE
+  - FIRSTPRIVATE
+  - LASTPRIVATE : In a loop construct the last value in the last iteration that
+    the private variable should be copied to a global construct.
+  - DEFAULT(PRIVATE|SHARED|NONE) : Default shared is what you get by default. None
+    means that you need to explicitly the type of the variable (shared vs private).
+    Private is not allowed in C. None is useful for debugging.
+
+    void wrong()
+    {
+      int tmp =0;
+      // This is buggy because there is no way to initialize the tmp variable once
+      // its made PRIVATE. So on print this will give value 0 value of the global
+      // copy.
+      #pragma omp parallel for private(tmp)
+        for(int i = 0; i<1000;++i) tmp+=j
+      printf("%d\n",tmp);
+    }
+
+    void correct()
+    {
+      int incr =0;
+      // This is fine because FIRSTPRIVATE is used which initializes it to the
+      // global value which here is 0
+      // Note that incr will not retain its value outside the scope though. Its
+      // a private variable. So outside it is 0. Only shared variables are modified
+      // in the code block
+      #pragma omp parallel for firstprivate(incr)
+        for(int i = 0; i<MAX;++i)
+        {
+          if(i%2==0) incr++;
+          A[i] = incr;
+        }
+    }
+
+    void sq2(int n, double *lastterm)
+    {
+      double x=0.0; int i;
+      // This is fine because LASTPRIVATE will instruct the compiler to store the
+      // very last value of x in the global variable x and hence lastterm will
+      // contain a non 0 value.
+      // Note that you can define firstprivate and lastprivate together
+      #pragma omp parallel for lastprivate(x)
+        for(i=0;i<n;i++)
+        {
+          x = a[i]*a[i]+b[i]*b[i];
+          b[i] = sqrt(x);
+        }
+        *lastterm = x;
+    }
