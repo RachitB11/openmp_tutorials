@@ -13,3 +13,5 @@ add_executable(3_integration_parallelized_false_sharing integration/3_integratio
 add_executable(4_integration_parallelized_critical integration/4_integration_parallelized_critical.cpp)
 add_executable(5_integration_reduction integration/5_integration_reduction.cpp)
 add_executable(mandel excercises/mandel.cpp)
+add_executable(linked_list excercises/linked_list.cpp)
+add_executable(linked_list_tasks excercises/linked_list_tasks.cpp)

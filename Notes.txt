@@ -383,3 +383,72 @@ Data Environment
         }
         *lastterm = x;
     }
+
+Tasks
+- Tasks are independent units of work.
+- Composes of:
+  - Code to execute
+  - Data environment
+  - Internal control variables
+    - Keeps track of stuff like whats the default no. of threads. These were controlled
+      by those runtime get set methods we learnt previously.
+    - The binding of these variables happens to the tasks not the thread
+- You setup tasks. It sort of maintains a queue and when threads become available
+  it picks up the tasks one by one.
+- Difference between tasks and sections
+  https://stackoverflow.com/questions/13788638/difference-between-section-and-task-openmp
+- Useful for understanding the task execution order
+  https://openmp.org/wp-content/uploads/sc13.tasking.ruud.pdf
+
+
+  #pragma omp parallel
+  {
+    // All the threads create this task (one per thread) and execute it
+    // Theres a barrier to wait for everyone to complete the task
+    #pragma omp task
+    foo();
+    #pragma omp barrier
+
+    //Here just one thread is creating the tasks (one copy).
+    //This does not mean that just one thread is gonna execute all these takss
+    //The single thread is just setting up the task queue. Once all the tasks are in queue
+    // the threads will start picking up the task.
+    // Also since nowait was not added, everyone is gonna wait till the tasks are completed
+    #pragma omp single
+    {
+      #pragma omp task
+      bar();
+
+      #pragma omp task
+      bar2();
+    }
+  }
+
+  // Assume this method is called within a single parallel space
+  int fib(int n)
+  {
+    int x,y;
+    if(n<2) return n;
+    #pragma omp task shared(x)
+      x = fib(n-1);
+    #pragma omp task shared(y)
+      y = fib(n-2);
+    #pragma omp taskwait
+      return x+y;
+  }
+
+  // GO through a list
+  list ml;
+  element* e;
+  #pragma omp parallel
+
+  // Here a single thread will queue up all the tasks and then once all the tasks
+  // are added to the queue the threads will start picking up the tasks one by
+  // one and complete them. Implicitly since it is a single and nowait is not
+  // called, all threads stay here till all the tasks are completed.
+  #pragma omp single
+  {
+    for(e=ml->first;e;e=e->next)
+    #pragma omp task firstprivate(e)
+      process(e);
+  }

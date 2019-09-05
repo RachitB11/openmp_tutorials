@@ -1,0 +1,19 @@
+To create a team of threads
+#pragma omp parallel
+
+To share work between threads
+#pragma omp for
+#pragma omp single
+
+To prevent conflicts (prevent races)
+#pragma omp critical
+#pragma omp atomic
+#pragma omp barrier
+#pragma omp master
+
+Data environment classes
+shared(variable_list)
+private(variable_list)
+firstprivate(variable_list)
+lastprivate(variable_list)
+reduction(op:variable_list)
