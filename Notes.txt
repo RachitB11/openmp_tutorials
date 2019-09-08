@@ -452,3 +452,69 @@ Tasks
     #pragma omp task firstprivate(e)
       process(e);
   }
+
+Thread private
+- Global data that are private to a thread. Like static class variables.
+- Example:
+  int counter = 0;
+
+  // Here there is gonna be a private counter per thread
+  #pragma omp threadprivate(counter)
+
+  int increment_counter()
+  {
+    counter++;
+    return counter;
+  }
+
+  // The value is retained in the master thread.
+
+CAUTION: Super advanced stuff. You probably should not have to do this.
+Memory model
+  - Both the shared memory as well as a cache of a particular processor may have different
+    values of the same variable. How to know which value to see.
+  - We need to just keep track of the order of reads and writes.
+  - The compiler decides the order of reads and writes to optimize the schedule
+    in which they happen.
+  - Memory model gives you more control over these reads, writes and synchronizations.
+  - Consistency:
+    - Sequential:
+      - They remain in the program order for each processor.
+      - They are seen to be in the same overall order by each of the other processors.
+      - You take a hit on performance because you've severely constrained how memory is managed
+    - Relaxed:
+      - Remove some RWS(Read Write Synchronization) constraints in favor of performance.
+      - They need not be in the order in which they are programmed.
+    - Flush:
+      - A sequence point at which a thread is guaranteed to see a consistent view of memory
+        with respect to the flush set.
+      - Flush set:
+       - A list of variables when the flush(list) construct is used.
+      - All R,W ops that overlap the flush set and occur prior to the flush must complete
+        before the flush executes.
+      - All R,W ops that overlap the flush set and occur after the flush don't execute
+        until after the flush.
+      - Flushes with overlapping flush sets cannot be reordered.
+      - Basically this guarantees that the RW operations of the flush set are following
+        a similar pattern and hence similar updates in each thread. So it is making a
+        thread consistent to the other threads.
+    - Example:
+      // In a parallel construct with a shared variable A
+      double A;
+      A = compute();
+      // Make sure that the value that the thread sees is available to all other threads
+      #pragma omp flush(A);
+    - Flush happen implicitly:
+      - At entry/exit of parallel region
+      - At implicit and explicit barriers
+      - At entry/exit to critical regions
+      - At points of locking/unlocking
+    - The capability of atomics was expanded to solve inconsistencies too
+      - #pragma omp atomic[read | write | update | capture]
+      - Atomic can protect loads. This is gonna prevent it from loading the value
+        midway through the update:
+        #pragma omp atomic read
+          v = x;
+      - Same with stores. We get the complete update
+        #pragma omp atomic write
+          x = expr
