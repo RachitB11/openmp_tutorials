@@ -17,3 +17,11 @@ private(variable_list)
 firstprivate(variable_list)
 lastprivate(variable_list)
 reduction(op:variable_list)
+threadprivate(variable_list)
+
+Design Patterns
+Single program multiple data: Each thread performs same thing but differ by ID of thread
+Loop parallelism: Collection of tasks defined as iterations of one or more loops which are divided.
+Divide and conquer: When a problem includes a method to divide into subproblems and
+  a way to recombine solutions of subproblems into a global solution (Like with tasks
+  and reduction)
